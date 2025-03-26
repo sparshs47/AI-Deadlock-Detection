@@ -1,1 +1,1 @@
-# AI-powered-deadlock-detection-system
+# AI-Deadlock-Detection
