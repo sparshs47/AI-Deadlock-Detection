@@ -1,5 +1,5 @@
 # osproject
-AI powered Deadlock Detection System
+AI-Deadlock-Detection
 
 # Contributors
 ## 1. Sparsh Sharma - 12310922
