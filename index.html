@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔄 Enhanced Deadlock Detector</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Deadlock.png/800px-Deadlock.png') no-repeat center center fixed;
+      background-size: cover;
+      color: #000;
+      position: relative;
+    }
+  
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.85); /* white overlay to improve contrast */
+      z-index: -1;
+    }
+  
+    body.dark-mode::before {
+      background-color: rgba(0, 0, 0, 0.85); /* dark overlay for dark mode */
+    }
+  
+    h2 {
+      background-color: #1e88e5;
+      color: white;
+      padding: 20px;
+      margin: 0;
+    }
+  
+    #controls {
+      margin: 20px;
+    }
+  
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+  
+    button {
+      background-color: #1e88e5;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  
+    button:hover {
+      background-color: #1565c0;
+    }
+  
+    svg {
+      border: 1px solid #ccc;
+      background-color: white;
+      margin-top: 10px;
+    }
+  
+    .process {
+      fill: #43a047;
+    }
+  
+    .resource {
+      fill: #1e88e5;
+    }
+  
+    .deadlocked {
+      fill: #e53935 !important;
+    }
+  
+    .label {
+      font-weight: bold;
+      font-size: 13px;
+      pointer-events: none;
+    }
+  
+    #message {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+  
+
+<h2>🔄 Enhanced Deadlock Detector</h2>
+
+<div id="controls">
+  <input type="text" id="process" placeholder="From (e.g., P1)">
+  <input type="text" id="resource" placeholder="To (e.g., R1)">
+  <button onclick="addEdge()">Add Edge</button>
+  <button onclick="detectDeadlockStepByStep()">Step-by-Step Detect</button>
+  <button onclick="resetGraph()">Reset</button>
+  <button onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+  <button onclick="saveGraph()">💾 Save</button>
+  <button onclick="loadGraph()">📂 Load</button>
+</div>
+
+<div id="message"></div>
+<svg id="graph" width="900" height="550"></svg>
+<audio id="alertSound" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3"></audio>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+  const svg = d3.select("#graph");
+  const width = +svg.attr("width");
+  const height = +svg.attr("height");
+
+  svg.append("defs").append("marker")
+    .attr("id", "arrow")
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 25)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("class", "arrowhead");
+
+  let nodes = new Map();
+  let links = [];
+
+  const simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(d => d.id).distance(120))
+    .force("charge", d3.forceManyBody().strength(-500))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  function addEdge() {
+    const p = document.getElementById("process").value.trim();
+    const r = document.getElementById("resource").value.trim();
+    if (!p || !r) {
+      showMessage("⚠️ Enter valid node names.", "orange");
+      return;
+    }
+    if (!nodes.has(p)) nodes.set(p, { id: p, type: p.startsWith("P") ? "process" : "resource" });
+    if (!nodes.has(r)) nodes.set(r, { id: r, type: r.startsWith("R") ? "resource" : "process" });
+    links.push({ source: p, target: r });
+    updateGraph();
+    document.getElementById("process").value = "";
+    document.getElementById("resource").value = "";
+  }
+
+  function updateGraph() {
+    svg.selectAll("*:not(defs)").remove();
+    const nodeData = Array.from(nodes.values());
+
+    const link = svg.selectAll(".link")
+      .data(links)
+      .enter().append("line")
+      .attr("stroke", "#999")
+      .attr("stroke-width", 2)
+      .attr("marker-end", "url(#arrow)");
+
+    const node = svg.selectAll(".node")
+      .data(nodeData)
+      .enter().append("circle")
+      .attr("r", 25)
+      .attr("class", d => d.type)
+      .call(drag(simulation));
+
+    const label = svg.selectAll(".label")
+      .data(nodeData)
+      .enter().append("text")
+      .text(d => d.id)
+      .attr("class", "label");
+
+    simulation.nodes(nodeData).on("tick", () => {
+      link.attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+      node.attr("cx", d => d.x).attr("cy", d => d.y);
+      label.attr("x", d => d.x - 10).attr("y", d => d.y + 5);
+    });
+
+    simulation.force("link").links(links);
+  }
+
+  function drag(simulation) {
+    return d3.drag()
+      .on("start", event => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+      })
+      .on("drag", event => {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+      })
+      .on("end", event => {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+      });
+  }
+
+  function detectDeadlockStepByStep() {
+    svg.selectAll("circle").classed("deadlocked", false);
+    const adj = {};
+    links.forEach(({ source, target }) => {
+      if (!adj[source]) adj[source] = [];
+      adj[source].push(target);
+    });
+
+    const visited = new Set();
+    const stack = new Set();
+    const cycle = new Set();
+    const keys = Array.from(nodes.keys());
+    let i = 0;
+
+    function step() {
+      if (i >= keys.length) {
+        showMessage("✅ No deadlock detected.", "green");
+        return;
+      }
+      const node = keys[i++];
+      visited.clear(); stack.clear(); cycle.clear();
+
+      if (dfs(node)) {
+        highlightCycle(cycle);
+        playAlert();
+        showMessage("🚨 Deadlock detected: " + [...cycle].join(", "), "red");
+        return;
+      }
+      setTimeout(step, 800); // smooth delay for step-by-step
+    }
+
+    function dfs(node) {
+      if (stack.has(node)) {
+        cycle.add(node);
+        return true;
+      }
+      if (visited.has(node)) return false;
+      visited.add(node); stack.add(node);
+      const neighbors = adj[node] || [];
+      for (let neighbor of neighbors) {
+        if (dfs(neighbor)) {
+          cycle.add(neighbor);
+          return true;
+        }
+      }
+      stack.delete(node);
+      return false;
+    }
+
+    step();
+  }
+
+  function highlightCycle(cycle) {
+    svg.selectAll("circle").each(function (d) {
+      if (cycle.has(d.id)) d3.select(this).classed("deadlocked", true);
+    });
+  }
+
+  function playAlert() {
+    document.getElementById("alertSound").play();
+    if (navigator.vibrate) navigator.vibrate(400);
+  }
+
+  function showMessage(msg, color = "black") {
+    const el = document.getElementById("message");
+    el.textContent = msg;
+    el.style.color = color;
+  }
+
+  function resetGraph() {
+    nodes = new Map();
+    links = [];
+    updateGraph();
+    showMessage("Graph reset.", "#333");
+  }
+
+  function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
+  }
+
+  function saveGraph() {
+    const state = {
+      nodes: Array.from(nodes.entries()),
+      links: links
+    };
+    localStorage.setItem("graphState", JSON.stringify(state));
+    showMessage("💾 Graph saved locally.", "blue");
+  }
+
+  function loadGraph() {
+    const data = JSON.parse(localStorage.getItem("graphState"));
+    if (data) {
+      nodes = new Map(data.nodes);
+      links = data.links;
+      updateGraph();
+      showMessage("📂 Graph loaded.", "blue");
+    } else {
+      showMessage("⚠️ No saved graph found.", "orange");
+    }
+  }
+</script>
+</body>
+</html>
