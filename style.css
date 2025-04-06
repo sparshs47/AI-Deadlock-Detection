@@ -1,0 +1,26 @@
+body {
+  font-family: "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  color: #000;
+  background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Deadlock.png/800px-Deadlock.png') no-repeat center center fixed;
+  background-size: cover;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.85); /* light overlay to improve readability */
+  z-index: -1;
+}
+
+body.dark-mode::before {
+  background-color: rgba(0, 0, 0, 0.85); /* dark overlay for dark mode */
+  z-index: -1;
+}
